@@ -39,8 +39,8 @@ from sample_factory.utils.timing import Timing
 from sample_factory.utils.utils import log, AttrDict, experiment_dir, ensure_dir_exists, join_or_kill, safe_get, \
     safe_put
 
-from sample_factory.model.model import RecurrentStateSpaceModel, ObsModel, RewardModel, PredModel
-from sample_factory.model.ES import CEM_Mutate_Novelty
+from sample_factory.model.model import HyperJD2TStateSpaceModel, ObsModel, RewardModel, PredModel
+
 from sample_factory.model.Pred_Conflicts import Z_pred
 from sample_factory.algorithms.appo.model import create_actor_critic
 from sample_factory.algorithms.appo.model_utils import ActionParameterizationContinuousNonAdaptiveStddev
@@ -1501,7 +1501,7 @@ class LearnerWorker:
 
         # world model
 
-        self.rssm_ally = RecurrentStateSpaceModel(self.cfg, self.action_space, self.cfg.state_dim,
+        self.rssm_ally = HyperJD2TStateSpaceModel(self.cfg, self.action_space, self.cfg.state_dim,
                                                   self.action_space.shape[0],
                                                   self.cfg.rnn_hidden_dim, self.cfg.num_adversaries,self.cfg.num_neighbors_obs,self.cfg.num_oppo_obs,
                                                   hidden_dim=self.cfg.rnn_hidden_dim,
@@ -1535,7 +1535,7 @@ class LearnerWorker:
                                   pred_model=self.predict_model_ally, shared_buffers=self.shared_buffers,
                                   device=self.device)
         # oppo
-        self.rssm_oppo = RecurrentStateSpaceModel(self.cfg, self.action_space, self.cfg.state_dim,
+        self.rssm_oppo = HyperJD2TStateSpaceModel(self.cfg, self.action_space, self.cfg.state_dim,
                                                   self.action_space.shape[0],
                                                   self.cfg.rnn_hidden_dim, self.cfg.num_good_agents,self.cfg.num_neighbors_obs,self.cfg.num_oppo_obs,
                                                   hidden_dim=self.cfg.rnn_hidden_dim,
@@ -1919,7 +1919,7 @@ class LearnerWorker:
 
         self.task_queue.put((TaskType.INIT, None))
         self.initialized_event.wait()
-        self.rssm_p_ally = RecurrentStateSpaceModel(self.cfg, self.action_space, self.cfg.state_dim,
+        self.rssm_p_ally = HyperJD2TStateSpaceModel(self.cfg, self.action_space, self.cfg.state_dim,
                                                     self.action_space.shape[0],
                                                     self.cfg.rnn_hidden_dim, self.cfg.num_adversaries,self.cfg.num_neighbors_obs,self.cfg.num_oppo_obs,
                                                     hidden_dim=self.cfg.rnn_hidden_dim,
@@ -1946,7 +1946,7 @@ class LearnerWorker:
                                     pred_model=self.predict_model_p_ally, shared_buffers=self.shared_buffers,
                                     device=self.device)
         # oppo
-        self.rssm_p_oppo = RecurrentStateSpaceModel(self.cfg, self.action_space, self.cfg.state_dim,
+        self.rssm_p_oppo = HyperJD2TStateSpaceModel(self.cfg, self.action_space, self.cfg.state_dim,
                                                     self.action_space.shape[0],
                                                     self.cfg.rnn_hidden_dim, self.cfg.num_good_agents,self.cfg.num_neighbors_obs,self.cfg.num_oppo_obs,
                                                     hidden_dim=self.cfg.rnn_hidden_dim,
