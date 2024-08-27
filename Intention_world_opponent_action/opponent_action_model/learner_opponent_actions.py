@@ -861,108 +861,31 @@ class LearnerWorker:
             intention, latent_strategy, action_pre = self.rssm[i].posterior_intention_latent(Obs[i], history[i])  ## T,N*K,D
             action_oppo_loss=0.5 * mse_loss(action_pre.reshape(Action1[1].shape[0], Action1[1].shape[1], -1),Action0, reduction='none').mean([0]).sum() # T,N,K4, opponent_action scheme
             
-            next_state_posterior = self.rssm[i].posterior(Obs[i])
-            delta_s_posterior = next_state_posterior[1:] - next_state_posterior[:-1]
+           
+
             
-            delta_s_prior, z, _ = self.rssm[i].prior(next_state_posterior[:-1], Action[:-1])
-            # delta_s_posterior2 = self.rssm.posterior_delta(obs[1:], z)
-            loss_delta_s_prior = 0.5 * mse_loss(
-                delta_s_prior, delta_s_posterior, reduction='none').mean([0, 1]).sum()
-            # loss_delta_s_posterior = 0.5 * mse_loss(
-            #     delta_s_posterior2, delta_s_posterior, reduction='none').mean([0, 1]).sum()
-            delta_s_posteriors.append(delta_s_posterior)
-            next_state_posteriors.append(next_state_posterior)
-            # pred_2:
-            state_2 = delta_s_prior[:-1] + next_state_posterior[:-2]
-            delta_s_prior2, _, _ = self.rssm[i].prior(state_2, Action[1:-1])
-            delta_s_prior2_all = delta_s_prior[:-1] + delta_s_prior2
-            delta_s_posterior2_all = next_state_posterior[2:] - next_state_posterior[:-2]
-            loss_delta_s_prior2 = 0.5 * mse_loss(
-                delta_s_prior2_all, delta_s_posterior2_all, reduction='none').mean([0, 1]).sum()
-
-            # pred_3:
-            state_3 = delta_s_prior2[:-1] + state_2[:-1]
-            delta_s_prior3, _, _ = self.rssm[i].prior(state_3, Action[2:-1])
-            delta_s_prior3_all = delta_s_prior2_all[:-1] + delta_s_prior3
-            delta_s_posterior3_all = next_state_posterior[3:] - next_state_posterior[:-3]
-            loss_delta_s_prior3 = 0.5 * mse_loss(
-                delta_s_prior3_all, delta_s_posterior3_all, reduction='none').mean([0, 1]).sum()
-
-            # pred_4:
-            state_4 = delta_s_prior3[:-1] + state_3[:-1]
-            delta_s_prior4, _, _ = self.rssm[i].prior(state_4, Action[3:-1])
-            delta_s_prior4_all = delta_s_prior3_all[:-1] + delta_s_prior4
-            delta_s_posterior4_all = next_state_posterior[4:] - next_state_posterior[:-4]
-            loss_delta_s_prior4 = 0.5 * mse_loss(
-                delta_s_prior4_all, delta_s_posterior4_all, reduction='none').mean([0, 1]).sum()
-
-            # delta_s=torch.cat([next_state_posterior[0],delta_s_posterior],dim=0)
-            predict_obs= self.obs_model[i](next_state_posterior[1:], z)
-            predict_reward = self.reward_model[i](next_state_posterior[1:], z)
-            obs_loss = 0.5 * mse_loss(predict_obs,Obs[i][1:])
-            # obs_loss = -torch.mean(predict_obs_distribution.log_prob(Obs[i][1:]))
-            reward_loss = 0.5 * mse_loss(predict_reward, Reward[i][:-1], reduction='none').mean([0, 1]).sum()
 
 
             # kl_loss=(kl_loss1+kl_loss2+kl_loss3+kl_loss4).mean()
-            loss_delta_s_prior_multi = loss_delta_s_prior + loss_delta_s_prior2 + loss_delta_s_prior3 + loss_delta_s_prior4
-            loss_model = loss_delta_s_prior_multi + obs_loss + reward_loss+action_oppo_loss
+           
+            loss_model = action_oppo_loss
             self.optimizer2[i].zero_grad()
-            Loss_delta_s_prior_multi.append(loss_delta_s_prior_multi)
-            Reward_loss.append(reward_loss)
-            Obs_loss.append(obs_loss)
+          
             Action_oppo_loss.append(action_oppo_loss)
             loss_model.backward()
             clip_grad_norm_(self.all_params[i], self.cfg.clip_grad_norm)
             self.optimizer2[i].step()
             print("agent_flag:", self.agents[i])
             log.debug(
-                'update_step: %3d loss: %.5f, loss_delta_s_prior_multi: %.5f, obs_loss: %.5f, act_loss: %.5f, reward_loss: % .5f'
+                'update_step: %3d loss: %.5f, act_loss: %.5f'
                 % (self.num_rollouts[0],
                    loss_model.item(),
-                   loss_delta_s_prior_multi.item(),
-                   obs_loss.item(),action_oppo_loss.item(), reward_loss.item(),
+                   action_oppo_loss.item()
                    ))
 
 
 
-
-            loss_rollout_ac = torch.tensor([0], device=self.device, dtype=torch.float32)
-            fake_buffer = self.rssm[i].rollout_policy(gpu_buffer, self.cfg.horizon, self.obs_model[i],
-                                                      self.reward_model[i],
-                                                      self.actor_critic, Obs_state, history[i],
-                                                      delta_s_posteriors[i], next_state_posteriors[i],
-                                                      self.L, self.B, self.N,
-                                                      self.actor_critic.encoders_critic[i],
-                                                      self.actor_critic.critic_linears[i],
-                                                      self.actor_critic.network_type_critic[i], self.lambda_t[i], i)
-            if i == 0:
-                fake_buffer.policy_id2 = fake_buffer.policy_id.reshape(self.cfg.quads_num_agents, self.cfg.rollout,
-                                                                       -1)[:self.cfg.num_adversaries].transpose(1,
-                                                                                                                0).reshape(
-                    -1).repeat(self.cfg.horizon)
-                fake_buffer.policy_version2 = fake_buffer.policy_version.reshape(self.cfg.quads_num_agents,
-                                                                                 self.cfg.rollout,
-                                                                                 -1)[
-                                              :self.cfg.num_adversaries].transpose(1, 0).reshape(
-                    -1).repeat(self.cfg.horizon)
-            else:
-                fake_buffer.policy_id2 = fake_buffer.policy_id.reshape(self.cfg.quads_num_agents, self.cfg.rollout,
-                                                                       -1)[self.cfg.num_adversaries:].transpose(1,
-                                                                                                                0).reshape(
-                    -1).repeat(self.cfg.horizon)
-                fake_buffer.policy_version2 = fake_buffer.policy_version.reshape(self.cfg.quads_num_agents,
-                                                                                 self.cfg.rollout,
-                                                                                 -1)[
-                                              self.cfg.num_adversaries:].transpose(1, 0).reshape(
-                    -1).repeat(self.cfg.horizon)
-
-            # statess[0] = next_states[-1].reshape(-1, self.cfg.state_dim)
-            # rnns[0] = next_rnn[-1].reshape(-1, self.cfg.rnn_hidden_dim)
-            loss_rollout_ac += self.update_by_rollout(fake_buffer, batch_size, experience_size, i, timing)
-
-
-        return loss_rollout_ac,Obs_loss,Reward_loss,Loss_delta_s_prior_multi,Action_oppo_loss
+        return Action_oppo_loss
 
 
 
@@ -1015,7 +938,7 @@ class LearnerWorker:
 
 
         if not self.cfg.intention_model:
-            loss_rollout_ac,obs_loss,reward_loss,loss_delta_s_prior_multi,Action_oppo_loss=self.update_world_model(history_obs, Obs,Obs_state, Action, Reward, gpu_buffer, batch_size, experience_size, timing)
+            Action_oppo_loss=self.update_world_model(history_obs, Obs,Obs_state, Action, Reward, gpu_buffer, batch_size, experience_size, timing)
 
 
 
@@ -1027,20 +950,13 @@ class LearnerWorker:
         with torch.no_grad():
             policy_version_before_train = self.train_step       
             
-            
-            
-            Loss_delta_s_prior_multi_ally = loss_delta_s_prior_multi[0] #ally
-            Loss_delta_s_prior_multi_oppo = loss_delta_s_prior_multi[1]  # oppo
-            # Loss_delta_latent_prior_multi_ally = loss_delta_latent_prior_multi[0]  # ally
-            # Loss_delta_latent_prior_multi_oppo = loss_delta_latent_prior_multi[1]  # oppo
-            Loss_obs_ally = obs_loss[0]
-            Loss_obs_oppo = obs_loss[1]
+                       
+           
 
             Loss_action_oppo_ally=Action_oppo_loss[0]
             Loss_action_oppo_oppo = Action_oppo_loss[1]
 
-            Loss_reward_ally = reward_loss[0]
-            Loss_reward_oppo = reward_loss[1]
+            
             early_stopping_tolerance = 1e-6
             early_stop = False
             prev_epoch_actor_loss = 1e9
@@ -1353,16 +1269,16 @@ class LearnerWorker:
         # stats.loss_obs = var.Loss_obs
         # stats.loss_reward = var.Loss_reward
 
-        stats.Loss_delta_s_prior_multi_ally=var.Loss_delta_s_prior_multi_ally
-        stats.Loss_delta_s_prior_multi_oppo=var.Loss_delta_s_prior_multi_oppo
+        # stats.Loss_delta_s_prior_multi_ally=var.Loss_delta_s_prior_multi_ally
+        # stats.Loss_delta_s_prior_multi_oppo=var.Loss_delta_s_prior_multi_oppo
         stats.Loss_action_oppo_ally = var.Loss_action_oppo_ally
         stats.Loss_action_oppo_oppo = var.Loss_action_oppo_oppo
-        stats.Loss_delta_s_prior_multi_oppo = var.Loss_delta_s_prior_multi_oppo
-        stats.Loss_obs_ally=var.Loss_obs_ally
-        stats.Loss_obs_oppo=var.Loss_obs_oppo
+        # stats.Loss_delta_s_prior_multi_oppo = var.Loss_delta_s_prior_multi_oppo
+        # stats.Loss_obs_ally=var.Loss_obs_ally
+        # stats.Loss_obs_oppo=var.Loss_obs_oppo
         
-        stats.Loss_reward_ally=var.Loss_reward_ally
-        stats.Loss_reward_oppo = var.Loss_reward_oppo
+        # stats.Loss_reward_ally=var.Loss_reward_ally
+        # stats.Loss_reward_oppo = var.Loss_reward_oppo
         stats.valids_fraction = var.valids.float().mean()
         stats.same_policy_fraction = (var.mb.policy_id == self.policy_id).float().mean()
 
