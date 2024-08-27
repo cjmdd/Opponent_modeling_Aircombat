@@ -39,9 +39,9 @@ from sample_factory.utils.timing import Timing
 from sample_factory.utils.utils import log, AttrDict, experiment_dir, ensure_dir_exists, join_or_kill, safe_get, \
     safe_put
 
-from sample_factory.model.model import HyperHD2TStateSpaceModel, ObsModel, RewardModel, PredModel
+from sample_factory.model.model import HyperHD2TStateSpaceModel, ObsModel, RewardModel
 
-from sample_factory.model.Pred_Conflicts import Z_pred
+
 from sample_factory.algorithms.appo.model import create_actor_critic
 from sample_factory.algorithms.appo.model_utils import ActionParameterizationContinuousNonAdaptiveStddev
 
@@ -367,9 +367,9 @@ class LearnerWorker:
         policy_version = self.train_step
         log.debug('Broadcast model weights for model version %d', policy_version)
         model_state = (policy_version, state_dict, self.obs_model_ally.state_dict(), self.rssm_ally.state_dict(),
-                       self.reward_model_ally.state_dict(), self.predict_model_ally.state_dict(),
+                       self.reward_model_ally.state_dict(),
                        self.obs_model_oppo.state_dict(), self.rssm_oppo.state_dict(),
-                       self.reward_model_oppo.state_dict(), self.predict_model_oppo.state_dict())
+                       self.reward_model_oppo.state_dict())
         # self.z_pred_p.obs_model.load_state_dict(self.obs_model.state_dict())
         # self.z_pred_p.rssm.load_state_dict(self.rssm.state_dict())
         # self.z_pred_p.reward_model.load_state_dict(self.reward_model.state_dict())
@@ -638,14 +638,14 @@ class LearnerWorker:
             'rssm_ally': self.rssm_ally.state_dict(),
             'obs_model_ally': self.obs_model_ally.state_dict(),
             'reward_model_ally': self.reward_model_ally.state_dict(),
-            'predict_model_ally': self.predict_model_ally.state_dict(),
+            # 'predict_model_ally': self.predict_model_ally.state_dict(),
             # 'reward_goal_model': self.reward_goal_model.state_dict(),
             # 'reward_obstacle_model': self.reward_obstacle_model.state_dict(),
             'optimizer2_ally': self.optimizer2_ally.state_dict(),
             'rssm_oppo': self.rssm_oppo.state_dict(),
             'obs_model_oppo': self.obs_model_oppo.state_dict(),
             'reward_model_oppo': self.reward_model_oppo.state_dict(),
-            'predict_model_oppo': self.predict_model_oppo.state_dict(),
+            # 'predict_model_oppo': self.predict_model_oppo.state_dict(),
             'optimizer2_oppo': self.optimizer2_oppo.state_dict(),
         }
         if self.aux_loss_module is not None:
@@ -1492,7 +1492,7 @@ class LearnerWorker:
         self.rssm_ally.load_state_dict(checkpoint_dict2['rssm_ally'])
         self.obs_model_ally.load_state_dict(checkpoint_dict2['obs_model_ally'])
         self.reward_model_ally.load_state_dict(checkpoint_dict2['reward_model_ally'])
-        self.predict_model_ally.load_state_dict(checkpoint_dict2['predict_model_ally'])
+        # self.predict_model_ally.load_state_dict(checkpoint_dict2['predict_model_ally'])
         # self.reward_goal_model.load_state_dict(checkpoint_dict2['reward_goal_model'])
         # self.reward_obstacle_model.load_state_dict(checkpoint_dict2['reward_obstacle_model'])
         self.optimizer2_ally.load_state_dict(checkpoint_dict2['optimizer2_ally'])
@@ -1500,7 +1500,7 @@ class LearnerWorker:
         self.rssm_oppo.load_state_dict(checkpoint_dict2['rssm_oppo'])
         self.obs_model_oppo.load_state_dict(checkpoint_dict2['obs_model_oppo'])
         self.reward_model_oppo.load_state_dict(checkpoint_dict2['reward_model_oppo'])
-        self.predict_model_oppo.load_state_dict(checkpoint_dict2['predict_model_oppo'])
+        # self.predict_model_oppo.load_state_dict(checkpoint_dict2['predict_model_oppo'])
         # self.reward_goal_model.load_state_dict(checkpoint_dict2['reward_goal_model'])
         # self.reward_obstacle_model.load_state_dict(checkpoint_dict2['reward_obstacle_model'])
         self.optimizer2_oppo.load_state_dict(checkpoint_dict2['optimizer2_oppo'])
@@ -1537,20 +1537,8 @@ class LearnerWorker:
                                              hidden_dim=self.cfg.rnn_hidden_dim).to(
             self.device)
         self.reward_model_ally.share_memory()
-        self.predict_model_ally = PredModel(self.cfg, self.cfg.state_dim, self.cfg.rnn_hidden_dim,
-                                            self.cfg.rnn_hidden_dim).to(self.device)
-        self.predict_model_ally.share_memory()
-        self.reward_goal_model_ally = RewardModel(self.cfg, self.cfg.state_dim, self.cfg.num_oppo_obs,self.cfg.rnn_hidden_dim,
-                                                  hidden_dim=self.cfg.rnn_hidden_dim).to(
-            self.device)
-        self.reward_goal_model_ally.share_memory()
-        self.reward_obstacle_model_ally = RewardModel(self.cfg, self.cfg.state_dim, self.cfg.num_oppo_obs,self.cfg.rnn_hidden_dim,
-                                                      hidden_dim=self.cfg.rnn_hidden_dim).to(self.device)
-        self.reward_obstacle_model_ally.share_memory()
-        self.z_pred_ally = Z_pred(self.cfg, rssm=self.rssm_ally, obs_model=self.obs_model_ally,
-                                  reward_model=self.reward_model_ally,
-                                  pred_model=self.predict_model_ally, shared_buffers=self.shared_buffers,
-                                  device=self.device)
+        
+        
         # oppo
         self.rssm_oppo = HyperHD2TStateSpaceModel(self.cfg, self.action_space, self.cfg.state_dim,
                                                   self.action_space.shape[0],
@@ -1570,27 +1558,14 @@ class LearnerWorker:
                                              hidden_dim=self.cfg.rnn_hidden_dim).to(
             self.device)
         self.reward_model_oppo.share_memory()
-        self.predict_model_oppo = PredModel(self.cfg, self.cfg.state_dim, self.cfg.rnn_hidden_dim,
-                                            self.cfg.rnn_hidden_dim).to(self.device)
-        self.predict_model_oppo.share_memory()
-        self.reward_goal_model_oppo = RewardModel(self.cfg, self.cfg.state_dim, self.cfg.num_oppo_obs,self.cfg.rnn_hidden_dim,
-                                                  hidden_dim=self.cfg.rnn_hidden_dim).to(
-            self.device)
-        self.reward_goal_model_oppo.share_memory()
-        self.reward_obstacle_model_oppo = RewardModel(self.cfg, self.cfg.state_dim, self.cfg.num_oppo_obs,self.cfg.rnn_hidden_dim,
-                                                      hidden_dim=self.cfg.rnn_hidden_dim).to(self.device)
-        self.reward_obstacle_model_oppo.share_memory()
-        self.z_pred_oppo = Z_pred(self.cfg, rssm=self.rssm_oppo, obs_model=self.obs_model_oppo,
-                                  reward_model=self.reward_model_oppo,
-                                  pred_model=self.predict_model_oppo, shared_buffers=self.shared_buffers,
-                                  device=self.device)
+        
         # print('learner_z1', id(self.z_pred))
         # print('learner_p1', id(self.z_pred.obs_model))
         self.para_ally = self.rssm_ally.parameters()
         self.all_params_ally = (list(self.rssm_ally.parameters()) +
                                 list(self.obs_model_ally.parameters()) +
                                 list(self.reward_model_ally.parameters()) +
-                                list(self.predict_model_ally.parameters())
+                                # list(self.predict_model_ally.parameters())
                                 # list(self.reward_goal_model.parameters())+
                                 # list(self.reward_obstacle_model.parameters())
                                 )
@@ -1600,7 +1575,7 @@ class LearnerWorker:
         self.all_params_oppo = (list(self.rssm_oppo.parameters()) +
                                 list(self.obs_model_oppo.parameters()) +
                                 list(self.reward_model_oppo.parameters()) +
-                                list(self.predict_model_oppo.parameters())
+                                # list(self.predict_model_oppo.parameters())
                                 # list(self.reward_goal_model.parameters())+
                                 # list(self.reward_obstacle_model.parameters())
                                 )
@@ -1949,19 +1924,7 @@ class LearnerWorker:
         self.reward_model_p_ally = RewardModel(self.cfg, self.cfg.state_dim, self.cfg.num_oppo_obs,self.cfg.rnn_hidden_dim,
                                                hidden_dim=self.cfg.rnn_hidden_dim)
         self.reward_model_p_ally.share_memory()
-        self.predict_model_p_ally = PredModel(self.cfg, self.cfg.state_dim, self.cfg.rnn_hidden_dim,
-                                              self.cfg.rnn_hidden_dim)
-        self.predict_model_p_ally.share_memory()
-        self.reward_goal_model_p_ally = RewardModel(self.cfg, self.cfg.state_dim, self.cfg.num_oppo_obs,self.cfg.rnn_hidden_dim,
-                                                    hidden_dim=self.cfg.rnn_hidden_dim)
-        self.reward_goal_model_p_ally.share_memory()
-        self.reward_obstacle_model_p_ally = RewardModel(self.cfg, self.cfg.state_dim, self.cfg.num_oppo_obs,self.cfg.rnn_hidden_dim,
-                                                        hidden_dim=self.cfg.rnn_hidden_dim)
-        self.reward_obstacle_model_p_ally.share_memory()
-        self.z_pred_p_ally = Z_pred(self.cfg, rssm=self.rssm_p_ally, obs_model=self.obs_model_p_ally,
-                                    reward_model=self.reward_model_p_ally,
-                                    pred_model=self.predict_model_p_ally, shared_buffers=self.shared_buffers,
-                                    device=self.device)
+       
         # oppo
         self.rssm_p_oppo = HyperHD2TStateSpaceModel(self.cfg, self.action_space, self.cfg.state_dim,
                                                     self.action_space.shape[0],
@@ -1976,19 +1939,7 @@ class LearnerWorker:
         self.reward_model_p_oppo = RewardModel(self.cfg, self.cfg.state_dim, self.cfg.num_oppo_obs,self.cfg.rnn_hidden_dim,
                                                hidden_dim=self.cfg.rnn_hidden_dim)
         self.reward_model_p_oppo.share_memory()
-        self.predict_model_p_oppo = PredModel(self.cfg, self.cfg.state_dim, self.cfg.rnn_hidden_dim,
-                                              self.cfg.rnn_hidden_dim)
-        self.predict_model_p_oppo.share_memory()
-        self.reward_goal_model_p_oppo = RewardModel(self.cfg, self.cfg.state_dim, self.cfg.num_oppo_obs,self.cfg.rnn_hidden_dim,
-                                                    hidden_dim=self.cfg.rnn_hidden_dim)
-        self.reward_goal_model_p_oppo.share_memory()
-        self.reward_obstacle_model_p_oppo = RewardModel(self.cfg, self.cfg.state_dim, self.cfg.num_oppo_obs,self.cfg.rnn_hidden_dim,
-                                                        hidden_dim=self.cfg.rnn_hidden_dim)
-        self.reward_obstacle_model_p_oppo.share_memory()
-        self.z_pred_p_oppo = Z_pred(self.cfg, rssm=self.rssm_p_oppo, obs_model=self.obs_model_p_oppo,
-                                    reward_model=self.reward_model_p_oppo,
-                                    pred_model=self.predict_model_p_oppo, shared_buffers=self.shared_buffers,
-                                    device=self.device)
+        
         # print('learner_z',id(self.z_pred_p))
         # print('learner_p', id(self.z_pred_p.obs_model))
         # print('learner_obs', id(self.obs_model_p))
