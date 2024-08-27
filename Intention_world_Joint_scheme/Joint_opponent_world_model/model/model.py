@@ -18,7 +18,7 @@ from sample_factory.model.transformer_intention_layer import TransformerIntentio
 from sample_factory.model.transformer_latent_layer import TransformerLatentLayer
 
 
-class RecurrentStateSpaceModel(nn.Module):
+class HyperJD2TStateSpaceModel(nn.Module):
     def __init__(self, cfg, action_space, state_dim, action_dim, rnn_hidden_dim, num_agents, num_neighbor_obs,
                  num_oppo_obs,
                  hidden_dim=256, min_stddev=0.1, act=torch.tanh, device=None):
